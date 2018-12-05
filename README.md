@@ -10,7 +10,9 @@ Dependencies:
 
 :: Firefox must be installed
 
-:: Third party modules: - re
+:: Third party modules: 
+
+                        - re
 
                         - requests
                         
