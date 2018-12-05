@@ -1,9 +1,33 @@
 # BT_NF-kB
 The Scripts used in my bachelor thesis "Bioinformatic Prediction of NF-kB Target Genes in the Human Genome."
+Resulting datasets are not put online, as they are intended for internal use.
 
-The scripts in this dictionary need several modules to be installed to work properly. For a guide on how to install them you can check https://automatetheboringstuff.com/appendixa/ . This ressource is taken from the book "Automate the boring stuff with python", by Al Sweigart, which was my main ressource for learning the python that was applied to the scripts in this repository. It is available for free on https://automatetheboringstuff.com/#toc
+For a guide on how to install third party python modules (listed below), which the scripts need to work properly, you can check https://automatetheboringstuff.com/appendixa/ . This ressource is taken from the book "Automate the boring stuff with python"(available for free on https://automatetheboringstuff.com/#toc ), by Al Sweigart, my main ressource for learning the Python used in this thesis.  
 
-The list of the used modules can be found in the methodology section of the thesis.
-An additional dependency is geckodriver for your specific OS ( https://github.com/mozilla/geckodriver/releases ). All scripts should be able to run on Windows and MacOS, while they were not tested for Linux.
+Dependencies:
+:: OS: Everything should run on Windows and MacOS(tested only partially), Linux not tested.
+:: Firefox must be installed
+:: Third party modules: - re
+                        - requests
+                        - csv
+                        - sys
+                        - os
+                        - selenium
+                        - time
+                        - lxml
+                        - platform
+                        - numpy
+                        - matplotlib
+                        - scipy
+                        - itertools
+:: Two Folders in the scripts directory (names mandatory):
+    - "geckodriver" -> holds the geckodriver utility for your OS (downloadable at https://github.com/mozilla/geckodriver/releases )
+    - "source_files" -> must hold: - "gene2ensembl" mapping file from ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/
+                                   - "cross_references.txt" & "promoter_ensembl.txt" from ftp://ccg.vital-it.ch/epdnew/H_sapiens/006/db/
+                                   - "all_data.txt" the result of the scripts by bpucker on https://github.com/bpucker/NFkB
+                                   
+:: Most of the scripts depend on the Bielefeld_basic_python_dicts.py" script, so this must be downloaded and put in the directory the script you want to execute is in.
 
+Other remarks:
 The script for Figure 6 requires some non-automatic steps, which are described in the comments of the script.
+
