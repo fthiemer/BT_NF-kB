@@ -49,11 +49,8 @@ Dependencies:
     
                                    - "cross_references.txt" & "promoter_ensembl.txt" from ftp://ccg.vital-it.ch/epdnew/H_sapiens/006/db/
                                    
-                                   - "all_data.txt" the result of the scripts by bpucker on https://github.com/bpucker/NFkB
+                                   - "all_data.txt" and "promoters.gff3" the result of the scripts by bpucker on https://github.com/bpucker/NFkB
+                                   - downloadable via EPD's select/download tool at https://epd.vital-it.ch/EPDnew_select.php by not entering any ids, pressing select and specifying a range of -5000 to +100 on the website after. 
                                    
+::"Figure_6.py" MUST be executed FIRST and requires some manual steps, which are described in the scripts comments and printed to the console.
 :: Most of the scripts depend on the Bielefeld_basic_python_dicts.py" script, so this must be downloaded and put in the directory the script you want to execute is in.
-
-Other remarks:
-
-The script for Figure 6 requires some non-automatic steps, which are described in the comments of the script.
-
