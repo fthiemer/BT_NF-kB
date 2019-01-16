@@ -2,8 +2,7 @@
 import csv
 import os
 
-with open(os.path.join(".", "important_source_files", "20180809_EPD_data_v6_analyzed", "all_data.txt"),
-newline = "") as allFile:
+with open(os.path.join(".", "source_files", "all_data.txt"), newline = "") as allFile:
 	allFile = csv.reader(allFile, delimiter = "\t")
 	allFile = list(allFile)
 	print("Number of BS: " + str(len(list(allFile))-1))

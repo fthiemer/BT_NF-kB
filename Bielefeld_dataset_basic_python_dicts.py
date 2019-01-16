@@ -5,12 +5,13 @@ import requests
 import sys
 from numpy import mean as mean
 
-def openReadableCSV(filename):#muss für jede Iteration neu kreiert werden
-    readableCSV=csv.reader(open(str(filename),newline=''),delimiter='\t')
+# define helper functions
+def openReadableCSV(filePath):
+    readableCSV=csv.reader(open(str(filePath),newline=''),delimiter='\t')
     return readableCSV
 
-def openWriteableCSV(filename):
-    writeableCSV=csv.writer(open(str(filename),'w+',newline=''),delimiter='\t')
+def openWriteableCSV(filePath):
+    writeableCSV=csv.writer(open(str(filePath),'w+',newline=''),delimiter='\t')
     return writeableCSV
     
 def extractEPDGeneName(PromoterID):
@@ -21,46 +22,83 @@ def extractEPDGeneName(PromoterID):
     else:
         return EPDName[0]
 
+def getEnsemblFromGeneSymbol(GeneSymbol):
+    if isinstance(GeneSymbol, str):
+        server = "https://rest.ensembl.org"
+        ext = "/xrefs/symbol/homo_sapiens/"+GeneSymbol+"?"
+        r = requests.get(server+ext, headers={ "Content-Type" : "application/json"})
+        if not r.ok:
+          r.raise_for_status()
+          sys.exit()
+        decoded = r.json()
+        if decoded != []:
+            EnsemblIDList = []
+            for i in range(len(decoded)):
+                EnsemblIDList.append(decoded[0]["id"])
+        else:
+            EnsemblIDList = []
+        return EnsemblIDList
+    else:
+        print("pls dont put in more than one gs at once")
+        input()
 
-def get_BB8_prom_BS_sum_dict(threshold = 0):
-    #returns data as dictionary with promoter ID as key, subdictionary holds the keys geneInfo and BS_data
-    #The BS_data key holds a list with one dictionary for every bs accessible over their category
-    #The categories are the following: GeneID CRE Chromosome Start End  Score Orientation dist_TSS RELA_central_BS_W ( -> QS_Wang_1)    RELA_cW_sur_fit ( -> QS_Wang_5)
-    #The geneInfo key holds a dict with the categories: "ENSEMBL_ID", "GeneName", "RefSeq", "Gene_Description", "exp_val"
-    #keys of geneInfo and BS_data give access to string values
-    
-    #first create foundational file if it doesnt already exitsts in the folder "source_files"
-    #Attention! When file is corrupt it needs to be deleted, before repeating this program
-    if(os.path.exists(os.path.join("source_files","BS_sum_complData.csv"))):
-        # define necessary functions
-        def getEnsemblFromGeneSymbol(GeneSymbol):
-            if isinstance(GeneSymbol, str):
-                server = "https://rest.ensembl.org"
-                ext = "/xrefs/symbol/homo_sapiens/"+GeneSymbol+"?"
-                r = requests.get(server+ext, headers={ "Content-Type" : "application/json"})
-                if not r.ok:
-                  r.raise_for_status()
-                  sys.exit()
-                decoded = r.json()
-                if decoded != []:
-                    EnsemblIDList = []
-                    for i in range(len(decoded)):
-                        EnsemblIDList.append(decoded[0]["id"])
+def enrich_basic_data():
+    wangFile = openReadableCSV(os.path.join(".", "source_files", "promDataForWang.csv"))
+    wangDict = {} # structure: {promID : {"Start" : , "Sequence" : }}
+    for row in wangFile:
+        wangDict[row[0]] = {"Start": int(row[1]), "Sequence": row[2]}
+    allDataFile = openReadableCSV(os.path.join(".", "source_files", "all_data.txt"))
+    expandedAllDataFile = openWriteableCSV(os.path.join(".", "source_files", "all_data_expanded.txt"))
+    iDict = {}
+    for row in allDataFile:
+        if allDataFile.line_num == 1:
+            row.append("BS_Sequence")
+            row.append("RELA_central_BS_W")
+            row.append("RELA_cW_sur_fit")
+            for index, column in enumerate(row):
+                iDict[column] = index
+        else:
+            length = int(row[iDict["End"]]) - int(row[iDict["Start"]])
+            readingStartPoint = int(row[iDict["Start"]]) - wangDict[row[iDict["PromoterID"]]]["Start"]
+            readingEndPoint = readingStartPoint + length
+            BSSequence = wangDict[row[iDict["PromoterID"]]]["Sequence"][readingStartPoint : readingEndPoint]
+            row.append(BSSequence)
+            if BSSequence[5].upper() in ["A", "T"]:
+                row.append(1)
+                if BSSequence[3:8].upper() in ["TTTAA", "AAATT", "AATTT", "TTAAA"]:
+                    row.append(1)
                 else:
-                    EnsemblIDList = []
-                return EnsemblIDList
+                    row.append(0)
             else:
-                print("pls dont put in more than one gs at once")
-                input()
-
-        BSFile = openReadableCSV(os.path.join(".","source_files", "all_data.txt"))
+                row.append(0)
+                row.append(0)
+        expandedAllDataFile.writerow(row)
+    
+def create_foundation_file():
+    if (not os.path.exists(os.path.join(".", "source_files","BS_sum_complData.csv"))):
+        print("creating foundation file for dictionary creation")
+        if( not os.path.exists(os.path.join(".", "source_files","all_data_expanded.txt"))):
+            enrich_basic_data()
+        # expanded result of the analysis by bpucker as assembled with the scripts on https://github.com/bpucker/NFkB
+        BSFile = openReadableCSV(os.path.join(".","source_files", "all_data_expanded.txt"))
+        # additional information about the chromosomes provided by bpucker
         promoterFile = openReadableCSV(os.path.join(".","source_files", "promoters.gff3"))
-        prom_ens = openReadableCSV(os.path.join(".","source_files", "promoter_ensembl.txt"))
+        # mapping files from the EPD FTP server: ftp://ccg.vital-it.ch/epdnew/H_sapiens/006/db/ 
+        prom_ens = openReadableCSV(os.path.join(".","source_files", "promoter_ensembl.txt")) 
         cross_ref = openReadableCSV(os.path.join(".","source_files", "cross_references.txt"))
+        # target file which serves as the basis of all created python dictionaries
         BS_sumFile = openWriteableCSV(os.path.join("source_files","BS_sum_complData.csv"))
+        
         #save data to add in dictionaries
-        ensemblDataDict = {} #saves data from cross_ref with ensembl as key and [ens, geneName, refseq, description]
+        ensemblDataDict = {} #saves data from cross_ref with ensembl as key and [ens, geneName, refseq, description, exp_val]
         geneNameDataDict = {} #same but with geneName as key
+
+        with open(os.path.join(".", "source_files", "bi_all_overlap_ensembls.csv")) as overlapEnsemblFile:
+            overlapEnsembls = set()
+            for ensembl in overlapEnsemblFile:
+                overlapEnsembls.add(ensembl.replace("\n", ""))
+            print("Overlap Ensembls gotten")
+
         for row in cross_ref:
             ensemblDataDict[row[0]] = row
             geneNameDataDict[row[1]] = row
@@ -73,6 +111,7 @@ def get_BB8_prom_BS_sum_dict(threshold = 0):
         for row in promoterFile: 
             if promoterFile.line_num > 3:
                 promEndDict[row[7].split("_%_")[1]] = int(row[4]) #end
+
         dictToWrite={}
         for bs in BSFile: #row in bsfile
             #write header
@@ -97,8 +136,7 @@ def get_BB8_prom_BS_sum_dict(threshold = 0):
                         currentEnsemblID = getEnsemblFromGeneSymbol(extractEPDGeneName(prom_ID))
                         if currentEnsemblID != []:
                             dictToWrite[prom_ID] = [[bs[1:]], 
-                            ["_%_".join(getEnsemblFromGeneSymbol(extractEPDGeneName(prom_ID))), 
-                            extractEPDGeneName(prom_ID), "XXX", "XXX"]]
+                            ["_%_".join(currentEnsemblID), extractEPDGeneName(prom_ID), "XXX", "XXX"]]
                         elif currentEnsemblID == []:
                             dictToWrite[prom_ID] = [[bs[1:]], ["XXX", extractEPDGeneName(prom_ID), "XXX", "XXX"]]
                         else:
@@ -118,6 +156,10 @@ def get_BB8_prom_BS_sum_dict(threshold = 0):
                         print("look at your code")
                         input()
         for promoter in dictToWrite:
+            if dictToWrite[promoter][1][0] in overlapEnsembls:
+                dictToWrite[promoter][1].append("Yes")
+            else:
+                dictToWrite[promoter][1].append("No")
             listToWrite = []
             BS_sumFile.writerow([promoter])
             BS_sumFile.writerow(dictToWrite[promoter][1])
@@ -125,9 +167,25 @@ def get_BB8_prom_BS_sum_dict(threshold = 0):
                 bsInfostring = "_%_".join(i)
                 listToWrite.append(bsInfostring)
             BS_sumFile.writerow(listToWrite)
+    else:
+        pass
+        
+        
+
+
+def get_prom_BS_sum_dict(threshold = 0):
+    #returns data as dictionary with promoter ID as key, subdictionary holds the keys geneInfo and BS_data
+    #The BS_data key holds a list with one dictionary for every bs accessible over their category
+    #The categories are the following: GeneID CRE Chromosome Start End  Score Orientation dist_TSS RELA_central_BS_W ( -> QS_Wang_1)    RELA_cW_sur_fit ( -> QS_Wang_5)
+    #The geneInfo key holds a dict with the categories: "ENSEMBL_ID", "GeneName", "RefSeq", "Gene_Description", "exp_val"
+    #keys of geneInfo and BS_data give access to string values
+    
+    #first create foundational file if it doesnt already exitsts in the folder "source_files"
+    #Attention! If file is corrupted it needs to be deleted, before repeating this program!
+    create_foundation_file()
+    
     #create promoter Dictionary based on the foundation file
-    BS_sum_file = openReadableCSV(os.path.join(".", "source_files", 
-    "BS_sum_complData.csv"))
+    BS_sum_file = openReadableCSV(os.path.join(".", "source_files","BS_sum_complData.csv"))
     prom_BS_sum_dict = {}
     for row in BS_sum_file:
         if BS_sum_file.line_num == 1:
@@ -143,7 +201,13 @@ def get_BB8_prom_BS_sum_dict(threshold = 0):
                     tmpSet.update(row[i].split("_%_"))
                     prom_BS_sum_dict[currentPromID]["geneInfo"][category] = "_%_".join(tmpSet)
                 else:
-                    prom_BS_sum_dict[currentPromID]["geneInfo"][category] = row[i]
+                    try:
+                        prom_BS_sum_dict[currentPromID]["geneInfo"][category] = row[i]
+                    except:
+                        print(i)
+                        print(category)
+                        print(row)
+                        input()
         elif (BS_sum_file.line_num + 2) % 3 == 0 :
             prom_BS_sum_dict[currentPromID]["BS_data"] = []
             for i,content in enumerate(row):
@@ -159,12 +223,12 @@ def get_BB8_prom_BS_sum_dict(threshold = 0):
                 BS[category] = int(BS[category])
     return prom_BS_sum_dict
 
-def get_BB8_gene_BS_sum_dict(threshold = 0):
+def get_gene_BS_sum_dict(threshold = 0):
     #creates a dict with genenames as keys, for another dict with the keys "geneInfo" and "BS_data"
-    #the only difference to the get_BB8_prom_BS_sum_dict function is the added key "num_of_promoters"
+    #the only difference to the get_prom_BS_sum_dict function is the added key "num_of_promoters"
     # in the "geneInfo" category
     #The BS_datas get fused without sorting out BSs which occur more than one time in the same gene.
-    promDict = get_BB8_prom_BS_sum_dict(threshold)
+    promDict = get_prom_BS_sum_dict(threshold)
     geneDict = {}
     for promoter in promDict:
         if promDict[promoter]["geneInfo"]["GeneName"] in geneDict:
@@ -185,7 +249,7 @@ def get_prom_dict_with_QS(threshold = 0):
     # adds QSs to the prom dict in additional category: "QSs"
     # keys are: 0, 1, 2, 3, "Wang1", "Wang5", "avgScore", "BS_sum"
     keyList = [0, 1, 2, 3, "Wang1", "Wang5", "avgScore", "BS_sum", "BS_sum_all_motifs"]
-    promDictQS = get_BB8_prom_BS_sum_dict(threshold)
+    promDictQS = get_prom_BS_sum_dict(threshold)
     for prom in promDictQS:
         for key in keyList:
             promDictQS[prom]["QSs"] = {}
@@ -267,7 +331,7 @@ def get_gene_dict_with_QS(threshold = 0):
     # keys are: 0, 1, 2, 3, "Wang1", "Wang5", "avgScore", "BS_sum"
     # avgHighestXmsp holds the QS_avg_x_highest_BS for RelA, RelB and c-Rel
     keyList = [0, 1, 2, 3, "Wang1", "Wang5", "avgScore", "BS_sum","BS_sum_all_motifs"]
-    geneDictQS = get_BB8_gene_BS_sum_dict(threshold)
+    geneDictQS = get_gene_BS_sum_dict(threshold)
     for gene in geneDictQS:
         for key in keyList:
             geneDictQS[gene]["QSs"] = {}
@@ -346,7 +410,8 @@ def get_gene_dict_with_QS(threshold = 0):
     return geneDictQS
 
 def get_prom_dict_with_best_QS():
-    # the subdictionary with all final QSs as in table 4 (BT) gets added 
+    # the subdictionary with all final QSs as in table 4 (BT), based on the dataset version which led to 
+    # the highest odds ratio gets added 
     # holding all the QSs as found in the table: avg4, 1,2,3,0, numBS, avgScore,wang1,wang5,numProm
     # the applied threshold is the same as in the table:  --, 370,310,350,450,480,330,480,--,--
     promDictBestQS = get_prom_dict_with_QS()
@@ -404,7 +469,7 @@ def get_motif_specific_prom_dict(threshold = 0):
     # adds QSs to the prom dict in additional category: "QSs"
     # keys are: 0, 1, 2, 3, "Wang1", "Wang5", "avgScore", "BS_sum"
     keyList = [0, 1, 2, 3, "Wang1", "Wang5", "avgScore", "BS_sum"]
-    promDictQS = get_BB8_prom_BS_sum_dict(threshold)
+    promDictQS = get_prom_BS_sum_dict(threshold)
     for prom in promDictQS:
         for key in keyList:
             promDictQS[prom]["QSs"] = {}
@@ -466,6 +531,8 @@ def get_motif_specific_prom_dict(threshold = 0):
     return promDictQS
     
 def get_motif_specific_prom_dict_with_best_QS():
+    # adds motif specific QSs with optimal dataset versions
+    # these can be accessed through the "best_QS" key
     promDictQS = get_motif_specific_prom_dict()
     for prom in promDictQS:
         for key in {"RELA": [], "RELB": [], "REL": [], "all": []}:
@@ -495,7 +562,7 @@ def get_motif_specific_gene_dict(threshold = 0):
     # adds QSs to the prom dict in additional category: "QSs"
     # keys are: 0, 1, 2, 3, "Wang1", "Wang5", "avgScore", "BS_sum"
     keyList = [0, 1, 2, 3, "Wang1", "Wang5", "avgScore", "BS_sum"]
-    geneDictQS = get_BB8_gene_BS_sum_dict(threshold)
+    geneDictQS = get_gene_BS_sum_dict(threshold)
     for gene in geneDictQS:
         for key in keyList:
             geneDictQS[gene]["QSs"] = {}
@@ -557,6 +624,8 @@ def get_motif_specific_gene_dict(threshold = 0):
     return geneDictQS
 
 def get_motif_specific_gene_dict_with_best_QS():
+    # adds motif specific QSs with optimal dataset versions as foundation
+    # these can be accessed through the "best_QS" key
     geneDictQS = get_motif_specific_gene_dict()
     for gene in geneDictQS:
         for key in {"RELA": [], "RELB": [], "REL": [], "all": []}:
