@@ -54,4 +54,4 @@ Dependencies:
                                    
 ::"Figure_6.py" MUST be executed FIRST and requires some manual steps, which are described in the scripts comments and printed to the console.
 
-:: Most of the scripts depend on the Bielefeld_basic_python_dicts.py" script, so this must be downloaded and put in the directory the script you want to execute is in.
+:: Most of the scripts depend on the "Bielefeld_basic_python_dicts.py" script, so this must be downloaded and put in the directory the script you want to execute is in.
