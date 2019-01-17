@@ -1,3 +1,5 @@
+#creates list of all ensembls present in both bielefeld as well as the other datasets
+#filename is "bi_all_overlap_ensembls.csv"
 #prints the data for figure 6
 #ATTENTION: This script requires the geckodriver binary to be in in a folder named geckodriver in the scripts directory
 # a manual step was done: The genenames were copied from the Yang et al., 2016 paper and were updated with the ncbi symbol checker (link in workflow) and saved as "symbol_checker_results_seu.txt" in the data folder. Same was done for the Bielefeld dataset(see line 274f)
@@ -438,13 +440,13 @@ def printVennData():
         print(i+str(len(ensemblDict[i])))
     for i in ensemblDict.keys():
         print(str(i) + ": " + str(len(ensemblDict[i])))
+    # save ensembls overlapping between bielefeld and other datasets in a file
+    with open(os.path.join(".", "source_files", "bi_all_overlap_ensembls.csv"), "w+", newline = "") as f:
+        overlapEnsmblFile = csv.writer(f, delimiter = "\t")
+        overlapEnsembls = []
+        for i in ["biLiBoSeu", "biBoSeu", "biLiSeu", "liBiBo", "biSeu", "liBi", "boBi"]:
+            overlapEnsembls.extend(i)
+        for i in overlapEnsembls:
+            overlapEnsmblFile.writerow([i])
 
-printVennData()     
-        
-# def getOverlapEnsembls():
-    # ensemblDict = getOverlapDict()
-    # overlapEnsembls = []
-    # for i in ["biLiBoSeu", "biBoSeu", "biLiSeu", "liBiBo", "biSeu", "liBi", "boBi"]:
-        # for j in ensemblDict[i]:
-            # overlapEnsembls.append(j)
-    # return overlapEnsembls
+printVennData()    

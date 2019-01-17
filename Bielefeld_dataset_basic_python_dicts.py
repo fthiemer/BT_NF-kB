@@ -43,6 +43,53 @@ def getEnsemblFromGeneSymbol(GeneSymbol):
         input()
 
 def enrich_basic_data():
+    if not os.path.exists(os.path.join(".", "source_files", "promDataForWang.csv")):
+        # create dictionary: {promID : {"Start" : , "Sequence" : }}
+        promDataForWang = {}
+        promDataFile = openReadableCSV(os.path.join(".", "source_files", "promoters.gff3"))
+        for row in promDataFile:
+            if promDataFile.line_num < 3:
+                continue
+            elif promDataFile.line_num == 3:
+                startIndex = row.index("Start")
+                promIndex = row.index("PID")
+            else:
+                promDataForWang[row[promIndex]] = {"Start" : row[startIndex]}
+        notThereList = []
+        with open(os.path.join(".", "source_files", "fasta_sequences_from_-5000_to_+100.fa"), "r") as sequenceFile:
+            for line_num, row in enumerate(sequenceFile):
+                if row[0] == ">" and line_num != 0:
+                    try:
+                        promDataForWang[currentPromoter]["Sequence"] = currentSequence
+                    except KeyError:
+                        notThereList.append(currentPromoter)
+                    finally:
+                        currentPromoter = re.compile(r'\D\D\d+\s[a-zA-Z0-9@\.-]+_\d+').findall(row)
+                        currentPromoter = currentPromoter[0].replace(" ", "_%_")
+                        currentSequence = ""
+                elif row[0] == ">":
+                    currentPromoter = re.compile(r'\D\D\d+\s[a-zA-Z0-9@\.-]+_\d+').findall(row)
+                    currentPromoter = currentPromoter[0].replace(" ", "_%_")
+                    currentSequence = ""
+                elif currentSequence == "":
+                    currentSequence = row.replace("\n", "")
+                else:
+                    currentSequence += row.replace("\n", "")
+            try:
+                promDataForWang[currentPromoter]["Sequence"] = currentSequence
+            except KeyError:
+                notThereList.append(currentPromoter)
+            sequenceFile.close()
+        print(str(len(notThereList)), " promoters where not found.")
+        promDataForWangFile = openWriteableCSV(os.path.join(".", "source_files", "promDataForWang.csv"))
+        for key in promDataForWang:
+            try:
+                promDataForWangFile.writerow([key, promDataForWang[key]["Start"], promDataForWang[key]["Sequence"]])
+            except Exception as exp:
+                print(exp)
+                print(key)
+                print(promDataForWang[key])
+                input()
     wangFile = openReadableCSV(os.path.join(".", "source_files", "promDataForWang.csv"))
     wangDict = {} # structure: {promID : {"Start" : , "Sequence" : }}
     for row in wangFile:
@@ -73,6 +120,7 @@ def enrich_basic_data():
                 row.append(0)
                 row.append(0)
         expandedAllDataFile.writerow(row)
+    
     
 def create_foundation_file():
     if (not os.path.exists(os.path.join(".", "source_files","BS_sum_complData.csv"))):
@@ -649,3 +697,5 @@ def get_motif_specific_gene_dict_with_best_QS():
                 geneDictQS[gene]["best_QS"]["Wang1"] = currentGeneDict[gene]["QSs"]["Wang1"]
             geneDictQS[gene]["best_QS"][keyList[i]] = currentGeneDict[gene]["QSs"][keyList[i]]
     return geneDictQS
+    
+get_prom_BS_sum_dict()
