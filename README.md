@@ -2,6 +2,8 @@
 The Scripts used in my bachelor thesis "Bioinformatic Prediction of NF-kB Target Genes in the Human Genome."
 Resulting datasets are not put online, as they are intended for internal use.
 
+The figures were reused in the paper by B. Pucker & H. Kadhim et al. (with different numbers: BachelorThesis' 4 -> Papers 2, BT 6 -> P. 4, BT 5 -> P. 6)
+
 For a guide on how to install third party python modules (listed below), which the scripts need to work properly, you can check https://automatetheboringstuff.com/appendixa/ . This ressource is taken from the book "Automate the boring stuff with python" (available for free on https://automatetheboringstuff.com/#toc ), by Al Sweigart, my main ressource for learning the Python used in this thesis.  
 
 Dependencies:
